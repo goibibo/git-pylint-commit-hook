@@ -32,7 +32,7 @@ def _current_commit():
         return 'HEAD'
 
 
-def _get_list_of_committed_files():
+def _get_list_of_committed_python_files():
     """ Returns a list of files about to be commited. """
     files = []
     # pylint: disable=E1103
@@ -44,10 +44,20 @@ def _get_list_of_committed_files():
         if result != '':
             result = result.split()
             if result[4] in ['A', 'M']:
-                files.append(result[5])
+                if _is_python_file(result[5]):
+                    files.append((result[5],None)) #None is initial score
 
     return files
 
+def _get_user():
+    """
+    Returns user
+    """
+    get_user_cmd = "git var GIT_AUTHOR_IDENT "
+    user = subprocess.check_output(
+        get_user_cmd.split()
+    )
+    return user.split()[0]
 
 def _is_python_file(filename):
     """Check if the input file looks like a Python script
@@ -75,15 +85,17 @@ def _parse_score(pylint_output):
 
     """
     for line in pylint_output.splitlines():
+        print line
         match = re.match(_SCORE_REGEXP, line)
         if match:
+            print "MATCHn\n\n\n"
             return float(match.group(1))
     return 0.0
 
 
 def check_repo(
         limit, pylint='pylint', pylintrc='.pylintrc', pylint_params=None,
-        suppress_report=False):
+        suppress_report=False, datfile="/tmp/git.dat", scorefile="/tmp/scores.dat"):
     """ Main function doing the checks
 
     :type limit: float
@@ -98,19 +110,12 @@ def check_repo(
     :param suppress_report: Suppress report if score is below limit
     """
     # List of checked files and their results
-    python_files = []
+    python_files = _get_list_of_committed_python_files()
 
     # Set the exit code
     all_filed_passed = True
 
-    # Find Python files
-    for filename in _get_list_of_committed_files():
-        try:
-            if _is_python_file(filename):
-                python_files.append((filename, None))
-        except IOError:
-            print 'File not found (probably deleted): {}\t\tSKIPPED'.format(
-                filename)
+    total_score = 0.0
 
     # Don't do anything if there are no Python files
     if len(python_files) == 0:
@@ -129,6 +134,7 @@ def check_repo(
 
     # Pylint Python files
     i = 1
+    n_files = len(python_files)
     for python_file, score in python_files:
         # Allow __init__.py files to be completely empty
         if os.path.basename(python_file) == '__init__.py':
@@ -143,26 +149,36 @@ def check_repo(
 
         # Start pylinting
         sys.stdout.write("Running pylint on {} (file {}/{})..\t".format(
-            python_file, i, len(python_files)))
+            python_file, i, n_files ))
         sys.stdout.flush()
         try:
             command = [pylint]
 
+            penv = os.environ.copy()
+            penv["LANG"]="it_IT.UTF-8"
+            penv["LC_CTYPE"]="it_IT.UTF-8"
+            penv["LC_COLLATE"]="it_IT.UTF-8"
+
+            """
             if pylint_params:
                 command += pylint_params.split()
                 if '--rcfile' not in pylint_params:
                     command.append('--rcfile={}'.format(pylintrc))
             else:
                 command.append('--rcfile={}'.format(pylintrc))
-
+            """
 
             command.append(python_file)
+
+
 
             proc = subprocess.Popen(
                 command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE)
+                stderr=subprocess.PIPE,
+                env=penv)
             out, _ = proc.communicate()
+            print "DONE"
         except OSError:
             print("\nAn error occurred. Is pylint installed?")
             sys.exit(1)
@@ -174,6 +190,8 @@ def check_repo(
         else:
             status = 'FAILED'
             all_filed_passed = False
+
+        total_score += score
 
         # Add some output
         print('{:.2}/10.00\t{}'.format(decimal.Decimal(score), status))
@@ -190,5 +208,47 @@ def check_repo(
 
         # Bump parsed files
         i += 1
+
+
+
+    user =  _get_user()
+
+    score_fd = open(scorefile, "r+")
+    prev_score = float(score_fd.read())
+
+
+    if 'FAILED' in status:
+        new_score = prev_score
+        """
+        print "IN FAILED @@", prev_score
+        new_score =  (total_score + prev_score) / (n_files + 1)
+        score_fd.seek(0)
+        score_fd.write("%s" % str(new_score))
+        """
+    else:
+        new_score =  (total_score + prev_score) / (n_files + 1)
+        score_fd.seek(0)
+        score_fd.write("%s" % str(new_score))
+
+
+    impact = new_score - prev_score
+    total_score = total_score / n_files
+
+
+    score_fd.close()
+
+    with open(datfile, "a+") as f:
+        f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO {:5.2f}  AGAINST {} STATUS {} \n'.format(user, total_score, impact, _current_commit(), status))
+        """
+        f.seek(-56*2, os.SEEK_END)
+        x = f.readlines()
+        prev_score = float(x[0].split()[1])
+        """
+
+    print "\n\n\n"
+    print "Total score ", str(total_score)
+    print "Your score made an impact of ", str(impact)
+    print "\n\n\n"
+
 
     return all_filed_passed
