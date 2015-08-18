@@ -39,14 +39,6 @@ def main():
         default='golint',
         help='Path to golint executable. Default: golint')
     parser.add_argument(
-        '--suppress-report',
-        action='store_true',
-        help='Suppress report output if golint fails')
-    parser.add_argument(
-        '--version',
-        action='store_true',
-        help='Print current version number')
-    parser.add_argument(
         '--datfile',
         default='/tmp/git.dat',
         help='Path to store git data. Default: /tmp/git.dat')
@@ -56,12 +48,8 @@ def main():
         help='Path to store git data. Default: /tmp/scores.dat')
     args = parser.parse_args()
 
-    if args.version:
-        print('git-golint-commit-hook version {}'.format(VERSION))
-        sys.exit(0)
-
     result = commit_hook.check_repo(
-        args.limit, args.golint, args.suppress_report, args.datfile, args.scorefile )
+        args.limit, args.golint, args.datfile, args.scorefile )
 
     if result:
         sys.exit(0)

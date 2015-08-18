@@ -72,7 +72,7 @@ def computeGoScore(warnings,totallines):
     """ Computes the score of a go file, 
         given golint's output and total number of lines in a go file.
     """
-    maxScore = 10
+    maxScore = 10.0
     currentScore = (float(warnings) / float(totallines)) * maxScore
     currentScore = maxScore - currentScore
     return currentScore
@@ -99,7 +99,6 @@ def runGolint(file_n,golint):
         for line in outp:
                 if line=='\n':
                         warnings += 1
-        print 'number of warnings found %d' % warnings
     except OSError:
             print("\nAn error occurred. Is golint installed?")
             sys.exit(1)
@@ -107,7 +106,7 @@ def runGolint(file_n,golint):
     return score
 
 def check_repo(
-        limit, golint='golint', suppress_report=False, datfile="/tmp/git.dat", scorefile="/tmp/scores.dat"):
+        limit, golint='golint', datfile="/tmp/git.dat", scorefile="/tmp/scores.dat"):
     """ Main function doing the checks
 
     :type limit: float
@@ -158,15 +157,6 @@ def check_repo(
 
         # Add some output
         print('{:.2}/10.00\t{}'.format(decimal.Decimal(score), status))
-        if 'FAILED' in status:
-            if suppress_report:
-            	command.append('--reports=n')
-            	proc = subprocess.Popen(
-                	command,
-                	stdout=subprocess.PIPE,
-                	stderr=subprocess.PIPE)
-           	out, _ = proc.communicate()
-
         # Bump parsed files
         i += 1
 
