@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+
+"""
+Git pre-commit hook for checking Go code quality.
+Enables tracking of  commit score history
+
+The hook requires golint
+
+AUTHOR:
+    Akanksha Gupta <erakankshagupta1989@gmail.com>
+    Jyotiswarup Raiturkar <jyotisr5@gmail.com>
+
+LICENSE:
+    Apache License 2.0
+    http://www.apache.org/licenses/LICENSE-2.0.html
+"""
+
+VERSION = "1.0"
+
+import argparse
+import sys
+
+from git_golint_commit_hook import commit_hook
+
+
+def main():
+    """ Main function handling configuration files etc """
+    parser = argparse.ArgumentParser(
+        description='Git golint commit hook')
+    parser.add_argument(
+        '--limit',
+        default=0.0,
+        type=float,
+        help=(
+            'Score limit, files with a lower score will stop the '
+            'commit. Default: 0.0'))
+    parser.add_argument(
+        '--golint',
+        default='golint',
+        help='Path to golint executable. Default: golint')
+    parser.add_argument(
+        '--golintrc',
+        default='.golintrc',
+        help=(
+            'Path to golintrc file. Options in the golintrc will '
+            'override the command line parameters. Default: .golintrc'))
+    parser.add_argument(
+        '--golint-params',
+        help='Custom golint parameters to add to the golint command')
+    parser.add_argument(
+        '--suppress-report',
+        action='store_true',
+        help='Suppress report output if golint fails')
+    parser.add_argument(
+        '--version',
+        action='store_true',
+        help='Print current version number')
+    parser.add_argument(
+        '--datfile',
+        default='/tmp/git.dat',
+        help='Path to store git data. Default: /tmp/git.dat')
+    parser.add_argument(
+        '--scorefile',
+        default='/tmp/scores.dat',
+        help='Path to store git data. Default: /tmp/scores.dat')
+    args = parser.parse_args()
+
+    if args.version:
+        print('git-golint-commit-hook version {}'.format(VERSION))
+        sys.exit(0)
+
+    result = commit_hook.check_repo(
+        args.limit, args.golint, args.golintrc, args.golint_params, args.suppress_report, args.datfile, args.scorefile )
+
+    if result:
+        sys.exit(0)
+    sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+    sys.exit(0)
+
+sys.exit(1)
