@@ -72,13 +72,9 @@ def computeGoScore(warnings,totallines):
     """ Computes the score of a go file, 
         given golint's output and total number of lines in a go file.
     """
-    currentScore = 0
     maxScore = 10
-    if currentScore > maxScore:
-        currentScore = 0
-    else :
-        currentScore = (float(warnings) / float(totallines)) * maxScore
-        currentScore = maxScore - currentScore
+    currentScore = (float(warnings) / float(totallines)) * maxScore
+    currentScore = maxScore - currentScore
     return currentScore
 
 def getNumberOfLines(file_n):
@@ -90,16 +86,12 @@ def getNumberOfLines(file_n):
                         totalLines += 1
     return totalLines
 
-def runGolint(file_n):
+def runGolint(file_n,golint):
     """ Runs golint on a file, and returns its score. """
-    golint= 'golint'
     totalLines = getNumberOfLines(file_n)
     try:
         command = [golint]
         penv = os.environ.copy()
-#       penv["LANG"]="it_IT.UTF-8"
-#       penv["LC_CTYPE"]="it_IT.UTF-8"
-#       penv["LC_COLLATE"]="it_IT.UTF-8"
         command.append(file_n)
         proc = subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=penv)
         outp, _ = proc.communicate()
@@ -115,24 +107,19 @@ def runGolint(file_n):
     return score
 
 def check_repo(
-        limit, golint='golint', golintrc='.golintrc', golint_params=None,
-        suppress_report=False, datfile="/tmp/git.dat", scorefile="/tmp/scores.dat"):
+        limit, golint='golint', suppress_report=False, datfile="/tmp/git.dat", scorefile="/tmp/scores.dat"):
     """ Main function doing the checks
 
     :type limit: float
     :param limit: Minimum score to pass the commit
     :type golint: str
     :param golint: Path to golint executable
-    :type golintrc: str
-    :param golintrc: Path to golintrc file
-    :type golint_params: str
-    :param golint_params: Custom golint parameters to add to the golint command
     :type suppress_report: bool
     :param suppress_report: Suppress report if score is below limit
     """
     # List of checked files and their results
     go_files = _get_list_of_committed_go_files()
-    print go_files
+
     # Set the exit code
     all_filed_passed = True
 
@@ -141,17 +128,6 @@ def check_repo(
     # Don't do anything if there are Go files
     if len(go_files) == 0:
         sys.exit(0)
-
-    # Load any pre-commit-hooks options from a .golintrc file (if there is one)
-    if os.path.exists(golintrc):
-        conf = ConfigParser.SafeConfigParser()
-        conf.read(pylintrc)
-        if conf.has_option('pre-commit-hook', 'command'):
-            golint = conf.get('pre-commit-hook', 'command')
-        if conf.has_option('pre-commit-hook', 'params'):
-            golint_params += ' ' + conf.get('pre-commit-hook', 'params')
-        if conf.has_option('pre-commit-hook', 'limit'):
-            limit = float(conf.get('pre-commit-hook', 'limit'))
 
     # Golint files
     i = 1
@@ -170,7 +146,7 @@ def check_repo(
         # Start golinting
         sys.stdout.write("Running golint on {} (file {}/{})..\t".format(filename, i, n_files ))
         sys.stdout.flush()    
-        score = runGolint(filename)
+        score = runGolint(filename,golint)
         # Verify the score
         if score >= float(limit):
             status = 'PASSED'

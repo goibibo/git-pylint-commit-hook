@@ -39,15 +39,6 @@ def main():
         default='golint',
         help='Path to golint executable. Default: golint')
     parser.add_argument(
-        '--golintrc',
-        default='.golintrc',
-        help=(
-            'Path to golintrc file. Options in the golintrc will '
-            'override the command line parameters. Default: .golintrc'))
-    parser.add_argument(
-        '--golint-params',
-        help='Custom golint parameters to add to the golint command')
-    parser.add_argument(
         '--suppress-report',
         action='store_true',
         help='Suppress report output if golint fails')
@@ -70,7 +61,7 @@ def main():
         sys.exit(0)
 
     result = commit_hook.check_repo(
-        args.limit, args.golint, args.golintrc, args.golint_params, args.suppress_report, args.datfile, args.scorefile )
+        args.limit, args.golint, args.suppress_report, args.datfile, args.scorefile )
 
     if result:
         sys.exit(0)
