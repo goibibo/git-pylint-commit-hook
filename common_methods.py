@@ -6,7 +6,7 @@ def is_empty_file(python_file):
     """
     Checking empty init file
     """
-    if os.stat(python_file).st_size == 0:
+    if os.path.isfile(python_file) and os.stat(python_file).st_size == 0 :
             return True
     return False
 

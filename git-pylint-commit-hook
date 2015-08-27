@@ -69,7 +69,7 @@ def main():
         print('git-pylint-commit-hook version {}'.format(VERSION))
         sys.exit(0)
 
-    result = commit_hook.check_repo(
+    result = commit_hook.push_commit_score(
         args.limit, args.pylint, args.pylintrc, args.pylint_params, args.suppress_report, args.datfile, args.scorefile )
 
     if result:
