@@ -1,3 +1,4 @@
+#!/usr/bin/env python2.7
 """ commit hook for golint """
 import decimal
 import os
@@ -6,6 +7,9 @@ import sys
 import subprocess
 import collections
 import ConfigParser
+import tempfile
+import urllib2
+import json
 
 
 ExecutionResult = collections.namedtuple(
@@ -13,55 +17,49 @@ ExecutionResult = collections.namedtuple(
     'status, stdout, stderr'
 )
 
+def get_repo_name():
+    currentpath = os.getcwd()
+    dirname = os.path.basename(currentpath)
+    return dirname
 
-def _execute(cmd):
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
+def get_changed_files(base, commit):
+    if (base == "0000000000000000000000000000000000000000"):
+	results = git(('git','show','--pretty=format:','--no-commit-id','--name-only',"%s" % (commit))).stdout
+    else:
+    	results = git(('git', 'diff', '--numstat', '--name-only', "%s..%s" % (base, commit))).stdout
+    return results.strip().split('\n')
+
+def git(args):
+    environ = os.environ.copy()
+    process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environ)
     stdout, stderr = process.communicate()
     status = process.poll()
     return ExecutionResult(status, stdout, stderr)
 
+def get_file_content(filename, commit):
+    results = git(('git', 'show', '%s:%s' % (commit, filename))).stdout
+    return results
 
 def _current_commit():
-    if _execute('git rev-parse --verify HEAD'.split()).status:
+    if git('git rev-parse --verify HEAD'.split()).status:
         return '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
     else:
         return 'HEAD'
 
-
-def _get_list_of_committed_go_files():
-    """ Returns a list of files about to be commited. """
-    files = []
-    diff_index_cmd = 'git diff-index --cached %s' % _current_commit()
-    output = subprocess.check_output(
-        diff_index_cmd.split()
-    )
-    for result in output.split('\n'):
-        if result != '':
-            result = result.split()
-            if result[4] in ['A', 'M']:
-                if _is_go_file(result[5]):
-                    files.append((result[5],None)) #None is initial score
-
-    return files
-
-def _get_user():
+def _get_user(commit):
     """
     Returns user
     """
-    get_user_cmd = "git var GIT_AUTHOR_IDENT "
+    get_user_cmd = 'git log -1 %s ' % (commit)
+    get_user_cmd += '--format=%ae'
     user = subprocess.check_output(
         get_user_cmd.split()
     )
     return user.split()[0]
 
 def _is_go_file(filename):
-    """Check if the input file looks like a Golang file.
-
-    Returns True if the filename ends in ".go", False otherwise.
+    """ Check if the input file looks like a Golang file.
+        Returns True if the filename ends in ".go", False otherwise.
     """
     if filename.endswith('.go'):
         return True
@@ -73,8 +71,11 @@ def computeGoScore(warnings,totallines):
         given golint's output and total number of lines in a go file.
     """
     maxScore = 10.0
-    currentScore = (float(warnings) / float(totallines)) * maxScore
-    currentScore = maxScore - currentScore
+    if totallines == 0:
+	currentScore = 0
+    else:
+    	currentScore = (float(warnings) / float(totallines)) * maxScore
+    	currentScore = maxScore - currentScore
     return currentScore
 
 def getNumberOfLines(file_n):
@@ -116,80 +117,69 @@ def check_repo(
     :type suppress_report: bool
     :param suppress_report: Suppress report if score is below limit
     """
-    # List of checked files and their results
-    go_files = _get_list_of_committed_go_files()
-
-    # Set the exit code
-    all_filed_passed = True
-
-    total_score = 0.0
-
-    # Don't do anything if there are Go files
-    if len(go_files) == 0:
+    line = sys.stdin.read()
+    (base, commit, ref) = line.strip().split()
+    modified = get_changed_files(base, commit)
+    files=[]
+    for fname in modified:
+	if _is_go_file(fname):
+		file_content = get_file_content(fname, commit)
+		files.append((fname,file_content,None))	
+  
+    # Don't do anything if there are no Go files
+    if len(modified) == 0:
         sys.exit(0)
 
     # Golint files
     i = 1
-    n_files = len(go_files)
-    for filename, score in go_files:
-        if os.stat(filename).st_size == 0:
-        	print(
-                    'Skipping lint on {} (empty file)..'
-                    '\tSKIPPED'.format(filename))
+    skipped_filecount=0
+    n_files = len(modified)
+    user = _get_user(commit)
+    reponame = get_repo_name()
+    url ='http://10.70.210.192:4000/api/Commits'
+    for filename, filecontent, score in files:
+	tmpfile = tempfile.NamedTemporaryFile(delete=False)	
+	tmpfile.write(filecontent)
+	tmpfile.close()
 
+        if os.stat(tmpfile.name).st_size == 0:
+        	print(
+                    'Skipping {} (empty file)..'
+                    '\tSKIPPED'.format(filename))
+		skipped_filecount += 1
+		os.unlink(tmpfile.name)
                 # Bump parsed files
                 i += 1
                 continue
 
-        status = ""
         # Start golinting
-        sys.stdout.write("Running golint on {} (file {}/{})..\t".format(filename, i, n_files ))
+        sys.stdout.write("Processing {} (file {}/{})..\t".format(filename, i, n_files ))
         sys.stdout.flush()    
-        score = runGolint(filename,golint)
+        score = runGolint(tmpfile.name,golint)
+	os.unlink(tmpfile.name)
+        status = ""
+
         # Verify the score
         if score >= float(limit):
             status = 'PASSED'
         else:
             status = 'FAILED'
-            all_filed_passed = False
-
-        total_score += score
-
+        
+        commit={}
+	commit.update({"email":user})
+ 	commit.update({"repo":reponame})
+	commit.update({"score":score})
+	commit.update({"status":status})
+	commit.update({"file":filename}) 
+        jsondata = json.dumps(commit)
+        req = urllib2.Request(url,jsondata)
+        req.add_header('Content-Type', 'application/json')
+        urllib2.urlopen(req).read()
         # Add some output
         print('{:.2}/10.00\t{}'.format(decimal.Decimal(score), status))
         # Bump parsed files
         i += 1
-
-    user =  _get_user()
-    score_fd = open(scorefile, "r+")
-    prev_score = float(score_fd.read())
-
-    if 'FAILED' in status:
-        new_score = prev_score
-        """
-        print "IN FAILED @@", prev_score
-        new_score =  (total_score + prev_score) / (n_files + 1)
-        score_fd.seek(0)
-        score_fd.write("%s" % str(new_score))
-        """
-    else:
-        new_score =  (total_score + prev_score) / (n_files + 1)
-        score_fd.seek(0)
-        score_fd.write("%s" % str(new_score))
-
-    impact = new_score - prev_score
-    total_score = total_score / n_files
-    score_fd.close()
-
-    with open(datfile, "a+") as f:
-        f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO {:5.2f}  AGAINST {} STATUS {} \n'.format(user, total_score, impact, _current_commit(), status))
-        """
-        f.seek(-56*2, os.SEEK_END)
-        x = f.readlines()
-        prev_score = float(x[0].split()[1])
-        """
-    print "\n\n\n"
-    print "Total score ", str(total_score)
-    print "Your score made an impact of ", str(impact)
-    print "\n\n\n"
-    return all_filed_passed
+   
+        with open(datfile, "a+") as f:
+        	f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user, score, commit, status))
+      
