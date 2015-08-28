@@ -249,9 +249,9 @@ def get_insertion_and_deletions(changed_file, commit, prev_commit):
     insert = 0
     delete = 0
     if len(updates) > 0:
-        insert = updates[1]
+        insert = updates[2]
     if len(updates) > 1:
-        delete = updates[2]
+        delete = updates[3]
     return (insert, delete)
 
 
@@ -362,11 +362,9 @@ def push_commit_score(
         commit_info = {}
         lint = _get_lint_type(changed_file)
         if lint:
-            sys.stdout.write('Processing {} ..\t'.format(changed_file))
+            sys.stdout.write('Processing start\n')
+            sys.stdout.write('pylint on {} \t \n'.format(changed_file))
             sys.stdout.flush()
-            if is_empty_file(lint_file):
-                print 'Skipping {} (empty file)..\tSKIPPED'.format(changed_file)
-                continue
             file_score = _get_file_score(lint, changed_file, commit)
 
             # prev_file_score = _get_file_score(lint, changed_file, base)
@@ -518,6 +516,3 @@ def check_repo(
 
     return all_filed_passed
 
-
-
-            
