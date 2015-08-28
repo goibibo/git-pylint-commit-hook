@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+
 """ Commit hook for pylint """
 
 import decimal
@@ -25,6 +26,9 @@ def _execute(cmd):
 
 
 def _current_commit():
+    """
+        Getting current Commit
+    """
     if _execute('git rev-parse --verify HEAD'.split()).status:
         return '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
     else:
@@ -93,6 +97,7 @@ def _parse_score(pylint_output):
             return float(match.group(1))
     return 0.0
 
+
 def _get_git_previous_commit():
     """
     Getting last commit SHA
@@ -102,6 +107,7 @@ def _get_git_previous_commit():
     output = subprocess.check_output(diff_index_cmd.split())
     return output
 
+
 _GIT_PYLINT_MINIMUM_SCORE = 4
 
 
@@ -109,13 +115,15 @@ def _get_prev_score(pylint, python_files, commit_sha='HEAD~1'):
     """
         Getting prev commit file score
     """
+
     total_score = 0
     checked_pylint_files = 0
     avg_score = 0
     for (python_file, score) in python_files:
         if is_empty_file(python_file):
             continue
-        git_commit_file = create_specfic_commit_git_file(python_file, commit_sha)
+        git_commit_file = create_specfic_commit_git_file(python_file,
+                commit_sha)
         (out, _) = _run_pylint(pylint, git_commit_file)
         os.remove(git_commit_file)
         if _parse_score(out):
@@ -128,14 +136,20 @@ def _get_prev_score(pylint, python_files, commit_sha='HEAD~1'):
         avg_score = _GIT_PYLINT_MINIMUM_SCORE
     return avg_score
 
+
 def get_pylint_score(lint, git_commit_file):
     """
         It is giving pylint_score of the file.
     """
+
     (out, _) = _run_pylint(lint, git_commit_file)
     return _parse_score(out)
 
+
 def _run_pylint(pylint, python_file, suppress_report=False):
+    """
+        Run pylint on python_file
+    """
     try:
         command = [pylint]
 
@@ -143,14 +157,6 @@ def _run_pylint(pylint, python_file, suppress_report=False):
         penv['LANG'] = 'it_IT.UTF-8'
         penv['LC_CTYPE'] = 'it_IT.UTF-8'
         penv['LC_COLLATE'] = 'it_IT.UTF-8'
-        """
-        if pylint_params:
-            command += pylint_params.split()
-            if '--rcfile' not in pylint_params:
-                command.append('--rcfile={}'.format(pylintrc))
-        else:
-            command.append('--rcfile={}'.format(pylintrc))
-        """
 
         command.append(python_file)
 
@@ -164,6 +170,7 @@ def _run_pylint(pylint, python_file, suppress_report=False):
         sys.exit(1)
     return (out, _value)
 
+
 def _process_git_log_data(git_log_data):
     """
     parse and process git log data 
@@ -174,71 +181,90 @@ def _process_git_log_data(git_log_data):
         git_log_commit.append(json.loads(each_commit))
     return git_log_commit
 
+
 def _get_lint_type(filename):
     """
         Getting type of lint e.g. pylint or golint
     """
+
     file_ext = filename.split('.')[-1]
-    lint_type = {
-        'py' : 'pylint',
-    }
+    lint_type = {'py': 'pylint'}
     return lint_type.get(file_ext, '')
+
 
 def _get_lint_score(lint, git_commit_file):
     """
         Returning lint function.
     """
+
     file_ext = git_commit_file.split('.')[-1]
-    lint_types = {
-    'py' : get_pylint_score,
-    #'go' : _get_golint_score
-    'other' : ''
-    }
+    lint_types = {'py': get_pylint_score, 'other': ''}  # 'go' : _get_golint_score
     return lint_types.get(file_ext, 'other')(lint, git_commit_file)
 
 
 def _get_file_score(lint, lint_file, commit_sha='HEAD~1'):
+    """
+        Get file score
+    """
     score = 0.0
-    if is_empty_file(lint_file):
-        return score
-    git_commit_file = create_specfic_commit_git_file(lint_file, commit_sha)
+    git_commit_file = create_specfic_commit_git_file(lint_file,
+            commit_sha)
     score = _get_lint_score(lint, git_commit_file)
     os.remove(git_commit_file)
     return score
 
+
 def _get_status(commit_score):
+    """
+        Get Status of file  
+    """
     if commit_score >= 0:
-        return 'SUCCESS'
+        return 'PASSED'
     else:
-        return 'Failure'
+        return 'FAILED'
+
 
 def _get_impact(commit_score):
-    return str(commit_score*10) + '%'
+    """
+        Get changed in score
+    """
+    return str(commit_score * 10) + '%'
+
 
 def _get_repo_name():
+    """
+        Get repo name on which pylint is running
+    """
     return os.path.basename(os.getcwd())
 
+
 def get_insertion_and_deletions(changed_file, commit, prev_commit):
-    updates = run_subprocess('git diff --stat {0}..{1} {2}'.format(commit, prev_commit, changed_file))
-    updates = re.findall(r'\d+',updates)
+    """
+        Get number of insert and delete on a particular commit
+    """
+    updates = \
+        run_subprocess('git diff --stat {0}..{1} {2}'.format(commit,
+                       prev_commit, changed_file))
+    updates = re.findall(r'\d+', updates)
     insert = 0
     delete = 0
     if len(updates) > 0:
         insert = updates[1]
     if len(updates) > 1:
         delete = updates[2]
-    return insert,delete
+    return (insert, delete)
+
 
 def _get_user(commit):
     """
     Returns user
     """
-    get_user_cmd = 'git log -1 %s ' % (commit)
+
+    get_user_cmd = 'git log -1 %s ' % commit
     get_user_cmd += '--format=%ae'
-    user = subprocess.check_output(
-        get_user_cmd.split()
-    )
+    user = subprocess.check_output(get_user_cmd.split())
     return user.split()[0]
+
 
 def get_commit_file_data(git_file, commit_sha='HEAD~1'):
     """
@@ -248,19 +274,25 @@ def get_commit_file_data(git_file, commit_sha='HEAD~1'):
     diff_index_cmd = 'git show %s:%s' % (commit_sha, git_file)
     return run_subprocess(diff_index_cmd)
 
+
 def is_empty_file(python_file):
     """
     Checking empty init file
     """
-    if os.path.isfile(python_file) and os.stat(python_file).st_size == 0 :
-            return True
+
+    if os.path.isfile(python_file) and os.stat(python_file).st_size \
+        == 0:
+        return True
     return False
 
+
 def create_specfic_commit_git_file(lint_file, commit_sha):
-    git_commit_file_name = 'lint_'+ commit_sha + lint_file.split('/')[-1]
-    # git_commit_file = '/'.join(lint_file.split('/')[:-1]
-    #                                + [git_commit_file_name])
-    git_commit_file = '/tmp/'+git_commit_file_name
+    """
+        Generate specfic commit git file
+    """
+    git_commit_file_name = 'lint_' + commit_sha + lint_file.split('/'
+            )[-1]
+    git_commit_file = '/tmp/' + git_commit_file_name
     if os.path.isfile(git_commit_file_name):
         os.remove(git_commit_file_name)
     f = open(git_commit_file, 'w')
@@ -268,24 +300,36 @@ def create_specfic_commit_git_file(lint_file, commit_sha):
     f.close()
     return git_commit_file
 
+
 def get_changed_files(base, commit):
-    if (base == "0000000000000000000000000000000000000000"):
-        results = run_subprocess('git show --pretty=format: --no-commit-id --name-only %s' % (commit))
+    """
+        Get changed git file 
+    """
+    if base == '0000000000000000000000000000000000000000':
+        results = \
+            run_subprocess('git show --pretty=format: --no-commit-id --name-only %s'
+                            % commit)
     else:
-        results = run_subprocess("git diff --numstat --name-only %s..%s" % (base, commit))
+        results = run_subprocess('git diff --numstat --name-only %s..%s'
+                                  % (base, commit))
     return results.strip().split('\n')
 
 
 def run_subprocess(args):
+    """
+        Run subprocess on git commands
+    """
     args = args.split(' ')
     try:
         environ = os.environ.copy()
-        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environ)
-        stdout, stderr = process.communicate()
+        process = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, env=environ)
+        (stdout, stderr) = process.communicate()
         status = process.poll()
-    except Exception as e:
-        print(str(e))
+    except Exception, e:
+        print str(e)
     return ExecutionResult(status, stdout, stderr).stdout
+
 
 def push_commit_score(
     limit,
@@ -318,72 +362,44 @@ def push_commit_score(
         commit_info = {}
         lint = _get_lint_type(changed_file)
         if lint:
-            sys.stdout.write("Processing {} ..\t".format(changed_file ))
-            sys.stdout.flush()    
+            sys.stdout.write('Processing {} ..\t'.format(changed_file))
+            sys.stdout.flush()
+            if is_empty_file(lint_file):
+                print 'Skipping {} (empty file)..\tSKIPPED'.format(changed_file)
+                continue
             file_score = _get_file_score(lint, changed_file, commit)
-            prev_file_score = _get_file_score(lint, changed_file, base)
-            commit_score = (file_score - prev_file_score)
-            insert, delete = get_insertion_and_deletions(changed_file, commit, base)
+
+            # prev_file_score = _get_file_score(lint, changed_file, base)
+
+            commit_score = file_score
+            (insert, delete) = \
+                get_insertion_and_deletions(changed_file, commit, base)
             user = _get_user(commit)
             commit_info = {
-                                    'score': commit_score,
-                                    'commit': commit,
-                                    'email': _get_user(commit),
-                                    'status': _get_status(commit_score),
-                                    'file': changed_file,
-                                    'repo': _get_repo_name(),
-                                    'insert': insert,
-                                    'delete':delete
-                                }
+                'score': commit_score,
+                'commit': commit,
+                'email': _get_user(commit),
+                'status': _get_status(commit_score),
+                'file': changed_file,
+                'repo': _get_repo_name(),
+                'insert': insert,
+                'delete': delete,
+                }
             jsondata = json.dumps(commit_info)
-            url ='http://10.70.210.192:4000/api/Commits'
-            req = urllib2.Request(url,jsondata)
+            url = 'http://10.70.210.192:4000/api/Commits'
+            req = urllib2.Request(url, jsondata)
             req.add_header('Content-Type', 'application/json')
             urllib2.urlopen(req).read()
+
             # Add some output
-            print('{:.2}/10.00\t{}'.format(decimal.Decimal(commit_score), _get_status(commit_score)))
 
-            with open(datfile, "a+") as f:
-                f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user, commit_score, commit, _get_status(commit_score)))    
+            print '{:.2}/10.00\t{}'.format(decimal.Decimal(commit_score),
+                    _get_status(commit_score))
 
-    '''
-        Code will be enable for all lints.
-    '''
-    # gitlogs = \
-    #     'git log -n 10 --pretty=format:{"commit":"%H","user":"%an","email":"%ce"}'
-    # git_log_output = run_subprocess(gitlogs)
-
-    # process_git_log_data = _process_git_log_data(git_log_output)
-    # list_of_commit_score = []
-    # for i in xrange(0, len(process_git_log_data) - 1):
-    #     commit_score = 0
-    #     commit = process_git_log_data[i]['commit']
-    #     prev_commit = process_git_log_data[i + 1]['commit']
-        
-    #     file_changed = \
-    #         'git log  --name-only --pretty=format:%f {0}..{1}'.format(prev_commit,
-    #             commit)
-    #     file_changed_info = run_subprocess(file_changed)
-    #     file_changed_list = file_changed_info.split('\n')[1:]
-    #     for changed_file in file_changed_list:
-    #         lint = _get_lint_type(changed_file)
-    #         if lint:
-    #             file_score = _get_file_score(lint, changed_file, commit)
-    #             prev_file_score = _get_file_score(lint, changed_file, prev_commit)
-    #             commit_score = (file_score - prev_file_score)
-    #             insert,delete = get_insertion_and_deletions(changed_file, commit, prev_commit)
-    #             list_of_commit_score.append({
-    #                                     'score': commit_score,
-    #                                     'commit': process_git_log_data[i]['commit'],
-    #                                     'email': process_git_log_data[i]['email'],
-    #                                     'status': _get_status(commit_score),
-    #                                     'impact': _get_impact(commit_score),
-    #                                     'file': changed_file,
-    #                                     'repo': _get_repo_name(),
-    #                                     'insert': insert,
-    #                                     'delete':delete
-    #                                 })
-
+            with open(datfile, 'a+') as f:
+                f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user,
+                        commit_score, commit,
+                        _get_status(commit_score))) 
 
 def check_repo(
     limit,
@@ -497,10 +513,11 @@ def check_repo(
     impact = new_score - prev_score
     total_score = total_score / n_files
 
-
     print 'Total score ', str(total_score)
     print 'Your score made an impact of ', str(impact)
 
-
-
     return all_filed_passed
+
+
+
+            
