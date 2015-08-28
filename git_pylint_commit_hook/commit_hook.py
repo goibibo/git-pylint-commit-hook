@@ -110,6 +110,9 @@ _GIT_PYLINT_MINIMUM_SCORE = 4
 
 
 def _get_prev_score(pylint, python_files, commit_sha='HEAD~1'):
+    """
+        Getting prev commit file score
+    """
     total_score = 0
     checked_pylint_files = 0
     avg_score = 0
@@ -130,6 +133,9 @@ def _get_prev_score(pylint, python_files, commit_sha='HEAD~1'):
     return avg_score
 
 def get_pylint_score(lint, git_commit_file):
+    """
+        It is giving pylint_score of the file.
+    """
     (out, _) = _run_pylint(lint, git_commit_file)
     return _parse_score(out)
 
@@ -173,6 +179,9 @@ def _process_git_log_data(git_log_data):
     return git_log_commit
 
 def _get_lint_type(filename):
+    """
+        Getting type of lint e.g. pylint or golint
+    """
     file_ext = filename.split('.')[-1]
     lint_type = {
         'py' : 'pylint',
@@ -181,6 +190,9 @@ def _get_lint_type(filename):
     return lint_type.get(file_ext, '')
 
 def _get_lint_score(lint, git_commit_file):
+    """
+        Returning lint function.
+    """
     file_ext = git_commit_file.split('.')[-1]
     lint_types = {
     'py' : get_pylint_score,
@@ -229,6 +241,17 @@ def get_repo_name():
     dirname = os.path.basename(currentpath)
     return dirname
 
+def _get_user(commit):
+    """
+    Returns user
+    """
+    get_user_cmd = 'git log -1 %s ' % (commit)
+    get_user_cmd += '--format=%ae'
+    user = subprocess.check_output(
+        get_user_cmd.split()
+    )
+    return user.split()[0]
+
 def push_commit_score(
     limit,
     pylint='pylint',
@@ -255,39 +278,39 @@ def push_commit_score(
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
 
-    file_changed = \
-        'git log  --name-only --pretty=format:%f {0}..{1}'.format(base,
+    git_logs = \
+        'git diff --name-only --pretty=format:%f {0}..{1}'.format(base,
                 commit)
-    for changed_file in file_changed:
+    git_changed_file_name_list = run_subprocess(git_logs)
+    for changed_file in git_changed_file_name_list.split('\n'):
+        commit_info = {}
         lint = _get_lint_type(changed_file)
         if lint:
             file_score = _get_file_score(lint, changed_file, commit)
-            prev_file_score = _get_file_score(lint, changed_file, prev_commit)
+            prev_file_score = _get_file_score(lint, changed_file, base)
             commit_score = (file_score - prev_file_score)
-            insert,delete = get_insertion_and_deletions(changed_file, commit, prev_commit)
-            list_of_commit_score.append({
+            insert, delete = get_insertion_and_deletions(changed_file, commit, base)
+            user = _get_user(commit)
+            commit_info = {
                                     'score': commit_score,
-                                    'commit': process_git_log_data[i]['commit'],
-                                    'email': process_git_log_data[i]['email'],
+                                    'commit': commit,
+                                    'email': _get_user(commit),
                                     'status': _get_status(commit_score),
-                                    'impact': _get_impact(commit_score),
                                     'file': changed_file,
                                     'repo': _get_repo_name(),
                                     'insert': insert,
                                     'delete':delete
-                                })
-    jsondata = json.dumps(commit)
-    url ='http://10.70.210.192:4000/api/Commits'
-    req = urllib2.Request(url,jsondata)
-    req.add_header('Content-Type', 'application/json')
-    urllib2.urlopen(req).read()
-    # Add some output
-    print('{:.2}/10.00\t{}'.format(decimal.Decimal(score), status))
-    # Bump parsed files
-    i += 1
+                                }
+            jsondata = json.dumps(commit_info)
+            url ='http://10.70.210.192:4000/api/Commits'
+            req = urllib2.Request(url,jsondata)
+            req.add_header('Content-Type', 'application/json')
+            urllib2.urlopen(req).read()
+            # Add some output
+            print('{:.2}/10.00\t{}'.format(decimal.Decimal(commit_score), _get_status(commit_score)))
 
-    with open(datfile, "a+") as f:
-        f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user, score, commit, status))    
+            with open(datfile, "a+") as f:
+                f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user, commit_score, commit, _get_status(commit_score)))    
 
     '''
         Generic code will be enable for all lints.

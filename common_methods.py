@@ -32,7 +32,7 @@ def run_subprocess(process_command):
     return output
 
 def create_specfic_commit_git_file(lint_file, commit_sha):
-    git_commit_file_name = 'lint_' + lint_file.split('/')[-1]
+    git_commit_file_name = 'lint_'+ commit_sha + lint_file.split('/')[-1]
     git_commit_file = '/'.join(lint_file.split('/')[:-1]
                                    + [git_commit_file_name])
     if os.path.isfile(git_commit_file_name):
