@@ -257,8 +257,9 @@ def is_empty_file(python_file):
 
 def create_specfic_commit_git_file(lint_file, commit_sha):
     git_commit_file_name = 'lint_'+ commit_sha + lint_file.split('/')[-1]
-    git_commit_file = '/'.join(lint_file.split('/')[:-1]
-                                   + [git_commit_file_name])
+    # git_commit_file = '/'.join(lint_file.split('/')[:-1]
+    #                                + [git_commit_file_name])
+    git_commit_file = '/tmp/'+git_commit_file_name
     if os.path.isfile(git_commit_file_name):
         os.remove(git_commit_file_name)
     f = open(git_commit_file, 'w')
