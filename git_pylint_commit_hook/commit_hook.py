@@ -12,10 +12,6 @@ import ConfigParser
 import json
 import urllib2
 
-from common_methods import is_empty_file, \
-		get_commit_file_data, create_specfic_commit_git_file, run_subprocess
-
-
 ExecutionResult = collections.namedtuple('ExecutionResult',
         'status, stdout, stderr')
 
@@ -185,7 +181,6 @@ def _get_lint_type(filename):
     file_ext = filename.split('.')[-1]
     lint_type = {
         'py' : 'pylint',
-        'go' : 'golint',
     }
     return lint_type.get(file_ext, '')
 
@@ -221,10 +216,7 @@ def _get_impact(commit_score):
     return str(commit_score*10) + '%'
 
 def _get_repo_name():
-    repo_name = run_subprocess('git rev-parse --show-toplevel')
-    repo_name = repo_name.split('\n')[0]
-    repo_name = repo_name.split('/')[-1]
-    return repo_name
+    return os.path.basename(os.getcwd())
 
 def get_insertion_and_deletions(changed_file, commit, prev_commit):
     updates = run_subprocess('git diff --stat {0}..{1} {2}'.format(commit, prev_commit, changed_file))
@@ -236,11 +228,6 @@ def get_insertion_and_deletions(changed_file, commit, prev_commit):
         delete = updates[2]
     return insert,delete
 
-def get_repo_name():
-    currentpath = os.getcwd()
-    dirname = os.path.basename(currentpath)
-    return dirname
-
 def _get_user(commit):
     """
     Returns user
@@ -251,6 +238,52 @@ def _get_user(commit):
         get_user_cmd.split()
     )
     return user.split()[0]
+
+def get_commit_file_data(git_file, commit_sha='HEAD~1'):
+    """
+    get previous commit git file data
+    """
+
+    diff_index_cmd = 'git show %s:%s' % (commit_sha, git_file)
+    return run_subprocess(diff_index_cmd)
+
+def is_empty_file(python_file):
+    """
+    Checking empty init file
+    """
+    if os.path.isfile(python_file) and os.stat(python_file).st_size == 0 :
+            return True
+    return False
+
+def create_specfic_commit_git_file(lint_file, commit_sha):
+    git_commit_file_name = 'lint_'+ commit_sha + lint_file.split('/')[-1]
+    git_commit_file = '/'.join(lint_file.split('/')[:-1]
+                                   + [git_commit_file_name])
+    if os.path.isfile(git_commit_file_name):
+        os.remove(git_commit_file_name)
+    f = open(git_commit_file, 'w')
+    f.write(get_commit_file_data(lint_file, commit_sha))
+    f.close()
+    return git_commit_file
+
+def get_changed_files(base, commit):
+    if (base == "0000000000000000000000000000000000000000"):
+        results = run_subprocess('git show --pretty=format: --no-commit-id --name-only %s' % (commit))
+    else:
+        results = run_subprocess("git diff --numstat --name-only %s..%s" % (base, commit))
+    return results.strip().split('\n')
+
+
+def run_subprocess(args):
+    args = args.split(' ')
+    try:
+        environ = os.environ.copy()
+        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environ)
+        stdout, stderr = process.communicate()
+        status = process.poll()
+    except Exception as e:
+        print(str(e))
+    return ExecutionResult(status, stdout, stderr).stdout
 
 def push_commit_score(
     limit,
@@ -278,14 +311,13 @@ def push_commit_score(
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
 
-    git_logs = \
-        'git diff --name-only --pretty=format:%f {0}..{1}'.format(base,
-                commit)
-    git_changed_file_name_list = run_subprocess(git_logs)
-    for changed_file in git_changed_file_name_list.split('\n'):
+    git_changed_file_name_list = get_changed_files(base, commit)
+    for changed_file in git_changed_file_name_list:
         commit_info = {}
         lint = _get_lint_type(changed_file)
         if lint:
+            sys.stdout.write("Processing {} ..\t".format(changed_file ))
+            sys.stdout.flush()    
             file_score = _get_file_score(lint, changed_file, commit)
             prev_file_score = _get_file_score(lint, changed_file, base)
             commit_score = (file_score - prev_file_score)
@@ -313,7 +345,7 @@ def push_commit_score(
                 f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user, commit_score, commit, _get_status(commit_score)))    
 
     '''
-        Generic code will be enable for all lints.
+        Code will be enable for all lints.
     '''
     # gitlogs = \
     #     'git log -n 10 --pretty=format:{"commit":"%H","user":"%an","email":"%ce"}'
