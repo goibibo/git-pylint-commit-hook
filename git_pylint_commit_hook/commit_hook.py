@@ -222,6 +222,7 @@ def get_insertion_and_deletions(changed_file, commit, prev_commit):
     updates = run_subprocess('git diff --stat {0}..{1} {2}'.format(commit, prev_commit, changed_file))
     updates = re.findall(r'\d+',updates)
     insert = 0
+    delete = 0
     if len(updates) > 0:
         insert = updates[1]
     if len(updates) > 1:
