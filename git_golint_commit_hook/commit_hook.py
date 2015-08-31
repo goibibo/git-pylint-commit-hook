@@ -119,6 +119,15 @@ def check_repo(
     """
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
+    reponame = get_repo_name()
+    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/isExists' % (commit)
+    request = urllib2.Request(url_get_commit) 
+    json_data = urllib2.urlopen(url_get_commit).read()
+    commit_data = json.loads(json_data) 
+    commit_exists = commit_data['isExists']
+    if commit_exists :
+        sys.exit(0)
+     
     modified = get_changed_files(base, commit)
     files=[]
     for fname in modified:
@@ -135,7 +144,6 @@ def check_repo(
     skipped_filecount=0
     n_files = len(modified)
     user = _get_user(commit)
-    reponame = get_repo_name()
     url ='http://10.70.210.192:4000/api/Commits'
     for filename, filecontent, score in files:
 	tmpfile = tempfile.NamedTemporaryFile(delete=False)	
@@ -165,13 +173,14 @@ def check_repo(
         else:
             status = 'FAILED'
         
-        commit={}
-	commit.update({"email":user})
- 	commit.update({"repo":reponame})
-	commit.update({"score":score})
-	commit.update({"status":status})
-	commit.update({"file":filename}) 
-        jsondata = json.dumps(commit)
+        committed_data={}
+	committed_data.update({"email":user})
+ 	committed_data.update({"repo":reponame})
+	committed_data.update({"score":score})
+	committed_data.update({"status":status})
+	committed_data.update({"file":filename})
+        committed_data.update({"commitid":commit}) 
+        jsondata = json.dumps(committed_data)
         req = urllib2.Request(url,jsondata)
         req.add_header('Content-Type', 'application/json')
         urllib2.urlopen(req).read()
