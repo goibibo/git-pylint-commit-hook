@@ -185,7 +185,7 @@ def check_repo(
         req.add_header('Content-Type', 'application/json')
         urllib2.urlopen(req).read()
         # Add some output
-        print('{:.2}/10.00\t{}'.format(decimal.Decimal(score), status))
+        print('{:.2}/10.00'.format(decimal.Decimal(score)))
         # Bump parsed files
         i += 1
    
