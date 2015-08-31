@@ -409,8 +409,7 @@ def push_commit_score(
 
             # Add some output
 
-            print '{:.2}/10.00\t{}'.format(decimal.Decimal(commit_score),
-                    _get_status(commit_score))
+            print 'Score : {:.2}/10.00'.format(decimal.Decimal(commit_score))
 
             with open(datfile, 'a+') as f:
                 f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user,
