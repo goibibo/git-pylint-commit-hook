@@ -10,7 +10,7 @@ setup(
     author_email='jyotisr5@gmail.com',
     keywords="git commit pre-commit hook pylint python",
     platforms=['Any'],
-    packages=['git_pylint_commit_hook'],
+    packages=['git_pylint_commit_hook', 'git_golint_commit_hook'],
     scripts=['git-pylint-commit-hook'],
     include_package_data=True,
     zip_safe=False,

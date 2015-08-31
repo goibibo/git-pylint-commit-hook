@@ -248,9 +248,9 @@ def get_insertion_and_deletions(changed_file, commit, prev_commit):
     updates = re.findall(r'\d+', updates)
     insert = 0
     delete = 0
-    if len(updates) > 0:
+    if len(updates) > 2:
         insert = updates[2]
-    if len(updates) > 1:
+    if len(updates) > 3:
         delete = updates[3]
     return (insert, delete)
 
@@ -330,6 +330,21 @@ def run_subprocess(args):
         print str(e)
     return ExecutionResult(status, stdout, stderr).stdout
 
+def is_commit_already_exist(commit):
+    """
+        Checking commit is passed to git points or not
+    """
+    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/isExists' % (commit)
+    request = urllib2.Request(url_get_commit) 
+    json_data = urllib2.urlopen(url_get_commit).read()
+    try:
+        commit_data = json.loads(json_data) 
+        commit_exists = commit_data.get('isExists', "")
+        if commit_exists:
+            return True
+    except Exception as e:
+        pass
+    return False
 
 def push_commit_score(
     limit,
@@ -357,6 +372,9 @@ def push_commit_score(
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
 
+    if is_commit_already_exist(commit):
+        sys.exit(0)
+
     git_changed_file_name_list = get_changed_files(base, commit)
     for changed_file in git_changed_file_name_list:
         commit_info = {}
@@ -375,7 +393,7 @@ def push_commit_score(
             user = _get_user(commit)
             commit_info = {
                 'score': commit_score,
-                'commit': commit,
+                'commitid': commit,
                 'email': _get_user(commit),
                 'status': _get_status(commit_score),
                 'file': changed_file,
