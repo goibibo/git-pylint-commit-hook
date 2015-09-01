@@ -334,7 +334,8 @@ def is_commit_already_exist(commit):
     """
         Checking commit is passed to git points or not
     """
-    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/isExists' % (commit)
+    reponame = _get_repo_name()
+    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
     request = urllib2.Request(url_get_commit) 
     json_data = urllib2.urlopen(url_get_commit).read()
     try:
