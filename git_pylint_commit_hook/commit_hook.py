@@ -334,11 +334,11 @@ def is_commit_already_exist(commit):
     """
         Checking commit is passed to git points or not
     """
-    reponame = _get_repo_name()
-    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
-    request = urllib2.Request(url_get_commit) 
-    json_data = urllib2.urlopen(url_get_commit).read()
-    try:
+    try:    
+        reponame = _get_repo_name()
+        url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
+        request = urllib2.Request(url_get_commit) 
+        json_data = urllib2.urlopen(url_get_commit).read()
         commit_data = json.loads(json_data) 
         commit_exists = commit_data.get('isExists', "")
         if commit_exists:
@@ -370,8 +370,9 @@ def push_commit_score(
     :param suppress_report: Suppress report if score is below limit
     """
 
-    line = sys.stdin.read()
-    (base, commit, ref) = line.strip().split()
+    
+    base = '7928b76f9cb0c2e53c5b343892ad359711a1d104'
+    commit = '27ffa7b4e64ad9e93ecf5b64e9cdf087b6bedafa'
 
     if is_commit_already_exist(commit):
         sys.exit(0)
@@ -534,3 +535,5 @@ def check_repo(
 
     return all_filed_passed
 
+if __name__=="__main__":
+    push_commit_score(2)
