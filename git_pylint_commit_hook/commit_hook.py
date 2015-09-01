@@ -370,11 +370,8 @@ def push_commit_score(
     :param suppress_report: Suppress report if score is below limit
     """
 
-    
-    base = '27ffa7b4e64ad9e93ecf5b64e9cdf087b6bedafa'
-    commit = '3f4d60a8799542e12d1eb9c98a6de6d7f9e0615f'
-
-
+    line = sys.stdin.read()
+    (base, commit, ref) = line.strip().split()
 
     if is_commit_already_exist(commit):
         sys.exit(0)
