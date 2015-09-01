@@ -120,7 +120,7 @@ def check_repo(
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
     reponame = get_repo_name()
-    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/isExists' % (commit)
+    url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
     request = urllib2.Request(url_get_commit) 
     json_data = urllib2.urlopen(url_get_commit).read()
     commit_data = json.loads(json_data) 
