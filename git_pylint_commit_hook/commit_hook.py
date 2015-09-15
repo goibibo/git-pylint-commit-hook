@@ -344,10 +344,10 @@ def is_commit_already_exist(commit):
         commit_data = json.loads(json_data)
         commit_exists = commit_data.get('isExists', "")
         if commit_exists:
-            return True, start_timer-timer()
+            return True, timer()-start_timer
     except Exception as e:
         pass
-    return False, start_timer-timer()
+    return False, timer()-start_timer
 
 def push_commit_score(
     limit,
