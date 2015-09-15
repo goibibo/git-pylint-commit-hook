@@ -334,22 +334,20 @@ def is_commit_already_exist(commit):
     """
         Checking commit is passed to git points or not
     """
-    try:    
-        from timeit import default_timer as timer
-        start_timer = timer()
+    from timeit import default_timer as timer
+    start_timer = timer()
+    try:
         reponame = _get_repo_name()
         url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
         request = urllib2.Request(url_get_commit) 
         json_data = urllib2.urlopen(url_get_commit).read()
         commit_data = json.loads(json_data)
-        end_timer = timer()
-        time_taken_by_request = end_timer - start_timer
         commit_exists = commit_data.get('isExists', "")
         if commit_exists:
-            return True
+            return True, start_timer-timer()
     except Exception as e:
         pass
-    return False, time_taken_by_request
+    return False, start_timer-timer()
 
 def push_commit_score(
     limit,
