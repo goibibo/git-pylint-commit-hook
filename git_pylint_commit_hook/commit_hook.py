@@ -335,17 +335,21 @@ def is_commit_already_exist(commit):
         Checking commit is passed to git points or not
     """
     try:    
+        from timeit import default_timer as timer
+        start_timer = timer()
         reponame = _get_repo_name()
         url_get_commit = 'http://10.70.210.192:4000/api/Commits/%s/%s/isExists' % (commit,reponame)
         request = urllib2.Request(url_get_commit) 
         json_data = urllib2.urlopen(url_get_commit).read()
-        commit_data = json.loads(json_data) 
+        commit_data = json.loads(json_data)
+        end_timer = timer()
+        time_taken_by_request = end_timer - start_timer
         commit_exists = commit_data.get('isExists', "")
         if commit_exists:
             return True
     except Exception as e:
         pass
-    return False
+    return False, time_taken_by_request
 
 def push_commit_score(
     limit,
@@ -373,7 +377,8 @@ def push_commit_score(
     line = sys.stdin.read()
     (base, commit, ref) = line.strip().split()
 
-    if is_commit_already_exist(commit):
+    commit_exist, time_taken_by_request = is_commit_already_exist(commit)
+    if commit_exist:
         sys.exit(0)
 
     git_changed_file_name_list = get_changed_files(base, commit)
@@ -413,9 +418,9 @@ def push_commit_score(
             print 'Score : {:.2}/10.00'.format(decimal.Decimal(commit_score))
 
             with open(datfile, 'a+') as f:
-                f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO  AGAINST {} STATUS {} \n'.format(user,
+                f.write('{:40s} COMMIT SCORE {:5.2f} IMPACT ON REPO AGAINST ref {} and base {} STATUS {}, time_taken_by_request by {} \n'.format(user,
                         commit_score, commit,
-                        _get_status(commit_score))) 
+                        _get_status(commit_score), base, time_taken_by_request )) 
 
 def check_repo(
     limit,
